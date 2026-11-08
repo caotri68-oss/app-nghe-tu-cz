@@ -705,7 +705,7 @@ if(S.rep>3)S.rep=3;
 if(!S.tok)S.tok='nghe-9ce853e98f5c';
 if(!S.srv&&window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())S.srv='https://nghe-tu-vung.onrender.com';
 let cur=null,playing=false,token=0,idx=-1,voicesList=[],mode='cards',fc={i:0,flip:false,order:null},editIt=null,filter='all',sel=null;
-const persist=()=>save('lessons',lessons),persistS=()=>save('settings',S);
+const persist=()=>{save('lessons',lessons);if(typeof schedulePush==='function')schedulePush()},persistS=()=>save('settings',S);
 
 // ---------- Đồng bộ từ vựng từ Google Sheet ----------
 const SHEET_ID='1Frm1ooddUFjFST6kHQmBKfd9Hnv_u5gvfgE3ndfBCG0',SHEET_GID='0';
@@ -730,19 +730,68 @@ function sheetToLessons(rows){const out=new Map();
     const k=title+'|'+la;if(!out.has(k))out.set(k,{id:hashId(k),title,a:la,b:lb,sheet:true,items:[]});
     out.get(k).items.push({w,m:m||'',ex:ex.filter(Boolean).join(', ')})});
   return [...out.values()]}
+// ---- Cầu nối Google Sheet: đọc + ghi hai chiều ----
+const BRIDGE='https://script.google.com/macros/s/AKfycbyfjpFinRbigdNHqRpLOzzAwWq9yiGQiUcaQLXC4ds6bYCMLp5H_w1TqoYGptkQYGau/exec',BKEY_EMBED='',SNAPK='snap',SEP='\u0001';
+var pushT=0,pushing=false;
+const bkey=()=>S.bkey||BKEY_EMBED;
+const isSample=l=>l.id===1&&l.title==='Mẫu: Chào hỏi';
+function rowsOf(list){const m=new Map();
+  list.forEach(l=>{if(isSample(l))return;const t=String(l.title||'').trim(),a=l.a||'cs';
+    l.items.forEach(it=>{const w=String(it.w||'').trim();if(!w)return;
+      m.set([t,a,w].join(SEP),{title:t,a,b:l.b||'vi',w,m:String(it.m||'').trim(),ex:String(it.ex||'').trim()})})});
+  return m}
+const sigOf=r=>r.b+'\t'+r.m+'\t'+r.ex;
+function saveSnap(map){const o={};map.forEach((r,k)=>o[k]=sigOf(r));save(SNAPK,o)}
+function diffOps(){const snap=load(SNAPK,null);if(snap===null)return null;
+  const cur=rowsOf(lessons),ops=[];
+  cur.forEach((r,k)=>{if(snap[k]!==sigOf(r))ops.push(Object.assign({op:'upsert'},r))});
+  Object.keys(snap).forEach(k=>{if(!cur.has(k)){const [t,a,w]=k.split(SEP);ops.push({op:'delete',title:t,a,w})}});
+  return ops}
+function schedulePush(){clearTimeout(pushT);pushT=setTimeout(()=>pushNow(false),1500)}
+async function pushNow(manual){
+  if(pushing||!BRIDGE||!bkey())return 0;
+  const ops=diffOps();if(!ops||!ops.length)return 0;
+  pushing=true;
+  try{
+    for(let i=0;i<ops.length;i+=250){
+      const r=await fetch(BRIDGE,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({key:bkey(),ops:ops.slice(i,i+250)})});
+      const j=await r.json();if(!j.ok)throw new Error(j.error||'lỗi cầu nối')}
+    saveSnap(rowsOf(lessons));
+    if(manual)toast(`Đã lưu ${ops.length} thay đổi lên Google Sheet`);
+    return ops.length}
+  catch(e){if(manual)toast('Chưa lưu được lên Sheet: '+(e&&e.message||e));return -1}
+  finally{pushing=false}}
+async function sheetRows(){
+  if(BRIDGE){try{const r=await fetch(BRIDGE+'?action=read&t='+Date.now(),{cache:'no-store'});const j=await r.json();
+    if(!j.ok)throw new Error(j.error||'lỗi cầu nối');return j.rows}catch(e){var be=e}}
+  try{return csvParse(await sheetText())}catch(e){throw be||e}}
 let syncing=false;
 async function syncSheet(manual){
-  if(syncing||!SHEET_ID)return;syncing=true;
-  try{const rows=csvParse(await sheetText()),fresh=sheetToLessons(rows);
-    if(!fresh.length)throw new Error('Sheet chưa có từ nào');
-    const old=new Map(lessons.filter(l=>l.sheet).map(l=>[l.id,l]));
-    fresh.forEach(l=>{const o=old.get(l.id);if(!o)return;
-      const km=new Map(o.items.map(x=>[x.w,x]));
-      l.items.forEach(it=>{const p=km.get(it.w);if(p)Object.keys(p).forEach(k=>{if(!(k in it)||(k==='known'&&p.known))it[k]=p[k]})})});
-    lessons=lessons.filter(l=>!l.sheet&&!(l.id===1&&l.title==='Mẫu: Chào hỏi')).concat(fresh);
-    persist();
+  if(syncing)return;syncing=true;
+  try{
+    await pushNow(false);                       // đẩy thay đổi còn dở trước khi kéo về
+    const rows=await sheetRows(),fresh=sheetToLessons(rows);
+    if(!fresh.length){                          // Sheet trống: giữ dữ liệu trong máy và đẩy lên
+      save(SNAPK,{});const n=await pushNow(manual);
+      if(manual&&!n)toast('Sheet chưa có từ nào');
+      syncing=false;return}
+    const byKey=new Map(lessons.filter(l=>!isSample(l)).map(l=>[String(l.title||'').trim()+'|'+(l.a||'cs'),l]));
+    fresh.forEach(l=>{const o=byKey.get(l.title+'|'+l.a);if(!o)return;
+      const km=new Map(o.items.map(x=>[String(x.w||'').trim(),x]));
+      l.items.forEach(it=>{const p=km.get(it.w);if(p)Object.keys(p).forEach(k=>{if(!(k in it))it[k]=p[k]})});
+      ['grammar','stories'].forEach(k=>{if(o[k])l[k]=o[k]})});
+    const fk=new Map(fresh.map(l=>[l.title+'|'+l.a,l]));
+    const next=[];
+    lessons.forEach(l=>{if(isSample(l))return;
+      const k=String(l.title||'').trim()+'|'+(l.a||'cs'),f=fk.get(k);
+      if(f){next.push(f);fk.delete(k)}else if(!l.sheet)next.push(l)});   // bài chỉ có trong máy thì giữ lại, sẽ đẩy lên
+    fk.forEach(f=>next.push(f));
+    lessons=next;
+    saveSnap(rowsOf(fresh));                    // mốc = đúng nội dung Sheet vừa kéo
+    save('lessons',lessons);
+    const n=await pushNow(false);               // bài chỉ có trong máy → đẩy lên Sheet
     if(!cur)home();
-    if(manual)toast(`Đã cập nhật ${fresh.length} bài từ Google Sheet`)}
+    if(manual)toast(n>0?`Đã đồng bộ, lưu thêm ${n} thay đổi lên Sheet`:`Đã đồng bộ ${fresh.length} bài từ Google Sheet`)}
   catch(e){if(manual)toast('Không đồng bộ được: '+(e&&e.message||e))}
   syncing=false}
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',2800)}
@@ -1243,10 +1292,10 @@ function home(){
   <main><div class="rowtools"><button class="pillprog" id="goStats">${I.bolt}<span>Tiến độ: ${st.kn}/${st.tot} từ</span></button><div class="langsel"><select id="langSel">${Object.keys(LANGS).filter(k=>k!=='vi').map(k=>`<option value="${k}" ${k===S.lang?'selected':''}>${short(k)} ⇄ Việt</option>`).join('')}</select></div></div>
   ${list.length?`<div class="card lesson star" id="starCard" style="--h:45"><div class="em"><span>${I.star}</span><img class="lic" src="fairy-star.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"></div><div><b>Sổ ôn riêng</b><small>${star.items.length?`${star.items.length} từ cần ôn lại · Đã thuộc ${sk}`:'Vào bài, bấm "Chọn" để thêm từ chưa thuộc'}</small>${star.items.length?`<div class="prog"><i style="width:${sk/star.items.length*100}%"></i></div>`:''}</div><span class="go">${I.chev}</span></div>`:''}
   ${list.length?list.map(l=>card(l,lessons.indexOf(l))).join(''):`<div class="empty2"><div class="big2"><div class="av3d m-${m}">${charSvg(S.char)}</div></div>Chưa có bài ${LANGS[S.lang][0]} nào.<br>Bấm nút + để thêm bài đầu tiên nhé!</div>`}
-  <button class="btn sec" style="width:100%;margin-bottom:10px" id="syncBtn">${I.search} Cập nhật từ Google Sheet</button></main>
+  <button class="btn sec" style="width:100%;margin-bottom:10px" id="syncBtn">${I.search} Đồng bộ với Google Sheet</button></main>
   <button class="btn fab" id="fabAdd">${I.plus}</button>${navHtml('home')}`;
   $('#langSel').onchange=e=>{S.lang=e.target.value;persistS();home()};
-  $('#fabAdd').onclick=openAdd;$('#openSet').onclick=openSet;$('#syncBtn').onclick=()=>syncSheet(true);
+  $('#fabAdd').onclick=openAdd;$('#openSet').onclick=openSet;$('#syncBtn').onclick=async()=>{if(!bkey()){const v=await dlg({title:'Nhập mã ghi để lưu từ vựng lên Google Sheet',msg:'Chỉ nhập một lần trên máy này. Bỏ trống nếu chỉ muốn tải từ vựng về.',input:'',ok:'Lưu'});if(v){S.bkey=v;persistS()}}syncSheet(true)};
   $('#goBtn').onclick=goStudy;$('#goStats').onclick=()=>go('stats');
   $('#hero').onclick=()=>{mood('h',1800);burst();dartAll()};
   $('#chg').onclick=e=>{e.stopPropagation();pickChar()};
@@ -1464,6 +1513,7 @@ $('#linkGo').onclick=async()=>{
 };
 hydrate();home();
 syncSheet(false);
+window.addEventListener('online',()=>syncSheet(false));
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncSheet(false)});
 if(TTS){hookNative();TTS.info().then(o=>{if(o.playing){playing=true;updPlay()}}).catch(()=>{})}
 // nhận link được chia sẻ từ app khác (Facebook, TikTok, YouTube...)
