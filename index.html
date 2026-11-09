@@ -1511,6 +1511,20 @@ $('#linkGo').onclick=async()=>{
   }catch(err){toast('Lỗi: '+err.message)}
   $('#linkGo').disabled=false;
 };
+// ---- Nút Back: đóng cửa sổ đang mở trước; ở màn hình chính thì hỏi có muốn thoát không ----
+let exiting=false;
+function armBack(){history.pushState({g:1},'')}
+window.addEventListener('popstate',async()=>{
+  if(exiting)return;
+  const open=document.querySelector('.modal.show');
+  if(open){open.classList.remove('show');armBack();return}
+  if(cur){cur=null;home();armBack();return}
+  armBack();
+  const ok=await dlg({title:'Thoát ứng dụng?',msg:'Bạn có muốn thoát Nghe Từ Vựng không?',ok:'Thoát'});
+  if(ok){exiting=true;const App=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.App;
+    if(App&&App.exitApp){App.exitApp()}else{history.go(-2)}}
+});
+armBack();
 hydrate();home();
 syncSheet(false);
 window.addEventListener('online',()=>syncSheet(false));
