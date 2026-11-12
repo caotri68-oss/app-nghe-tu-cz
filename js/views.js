@@ -61,6 +61,7 @@ function home(){
   <button class="btn fab" id="fabAdd">${I.plus}</button>${navHtml('home')}`;
   $('#langSel').onchange=e=>{S.lang=e.target.value;persistS();home()};
   $('#fabAdd').onclick=openAdd;$('#openSet').onclick=openSet;$('#syncBtn').onclick=async()=>{if(!bkey()){const v=await dlg({title:'Nhập mã ghi để lưu từ vựng lên Google Sheet',msg:'Chỉ nhập một lần trên máy này. Bỏ trống nếu chỉ muốn tải từ vựng về.',input:'',ok:'Lưu'});if(v){S.bkey=v;persistS()}}syncSheet(true)};
+  if(TYNA&&$('#syncBtn'))$('#syncBtn').remove();
   $('#goBtn').onclick=goStudy;$('#goStats').onclick=()=>go('stats');
   $('#hero').onclick=()=>{mood('h',1800);burst();dartAll()};
   $('#chg').onclick=e=>{e.stopPropagation();pickChar()};
@@ -199,6 +200,7 @@ function openSet(){
 }
 $('#expBtn').onclick=exportData;$('#impBtn').onclick=()=>$('#impIn').click();
 $('#impIn').onchange=e=>{const f=e.target.files[0];if(f)importData(f);e.target.value=''};
+$('#swProfile').onclick=()=>{try{localStorage.removeItem('ntv_profile')}catch(e){}location.reload()};
 $('#closeSet').onclick=()=>{$('#setModal').classList.remove('show');if(cur)lesson()};
 
 // ---------- Add lesson ----------

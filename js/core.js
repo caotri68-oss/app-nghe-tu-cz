@@ -100,13 +100,13 @@ function burst(){const w=document.querySelector('.avwrap');if(!w)return;const co
 function heroHtml(){const F=FAIRY[S.fairy]||FAIRY.star,m=moodNow(),f=F.svg;
  return `<div class="hero ${F.c} ${m==='s'?'sleepy':''}" id="hero"><div class="avwrap"><div class="orbit o2"><span class="spark s1">${f}</span><span class="spark s3">${f}</span></div><div class="orbit"><span class="spark s1">${f}</span><span class="spark s2">${f}</span><span class="spark s3">${f}</span><span class="spark s4">${f}</span></div><div class="av3d m-${m}">${charSvg(S.char)}</div></div></div>`}
 function pickChar(){
- let c=S.char||'bear',fr=S.fairy||'star',nm=S.name||'Robert';
+ let c=S.char||'bear',fr=S.fairy||'star',nm=S.name||DEFNAME;
  const o=document.createElement('div');o.className='kp';
  const draw=()=>{o.innerHTML=`<div class="ks"><h3>Chọn bạn đồng hành</h3><p class="ksub">Bạn nhỏ này sẽ cùng học với bạn mỗi ngày.</p><div class="kg">${Object.keys(CH).map(k=>`<button class="kc ${k===c?'on':''}" data-c="${k}"><span class="av3d m-n" style="position:static;display:block;background:none;box-shadow:none;width:100%">${charSvg(k)}</span>${CH[k].n}</button>`).join('')}</div><div class="kl">Tinh linh bay quanh</div><div class="kg fg">${Object.keys(FAIRY).map(k=>`<button class="kc fc ${k===fr?'on':''}" data-f="${k}"><span class="fi hero ${FAIRY[k].c}" style="display:block;position:static;margin:0;color:${k==='star'?'#FFC83D':''}"><span class="spark" style="position:static;display:block;width:30px;height:30px;animation:none">${FAIRY[k].svg}</span></span>${FAIRY[k].n}</button>`).join('')}</div><div class="kl">Tên của bạn</div><input type="text" id="kpn" maxlength="20" value="${esc(nm)}"><div class="row"><button class="btn sec" id="kpc">Huỷ</button><button class="btn" id="kpo">Xong</button></div></div>`;
   o.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{nm=o.querySelector('#kpn').value;c=b.dataset.c;draw()});
   o.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{nm=o.querySelector('#kpn').value;fr=b.dataset.f;draw()});
   o.querySelector('#kpc').onclick=()=>o.remove();
-  o.querySelector('#kpo').onclick=()=>{S.char=c;S.fairy=fr;S.name=o.querySelector('#kpn').value.trim()||'Robert';persistS();o.remove();home();setTimeout(()=>{mood('h',1800);burst()},60);toast('Chào '+S.name+'!')};
+  o.querySelector('#kpo').onclick=()=>{S.char=c;S.fairy=fr;S.name=o.querySelector('#kpn').value.trim()||DEFNAME;persistS();o.remove();home();setTimeout(()=>{mood('h',1800);burst()},60);toast('Chào '+S.name+'!')};
   o.onclick=e=>{if(e.target===o)o.remove()};
  };
  draw();document.body.appendChild(o);
@@ -114,15 +114,15 @@ function pickChar(){
 const hydrate=()=>document.querySelectorAll('[data-ic]').forEach(e=>{e.outerHTML=I[e.dataset.ic]});
 
 const $=s=>document.querySelector(s);
-const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
-const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(profileKey(k)))??d}catch{return d}};
+const save=(k,v)=>{try{localStorage.setItem(profileKey(k),JSON.stringify(v))}catch{}};
 const norm=it=>Array.isArray(it)?{w:it[0],m:it[1],ex:''}:it;
 let lessons=(load('lessons',null)||[{id:1,title:'Mẫu: Chào hỏi',a:'cs',b:'vi',items:[['Dobrý den','Xin chào'],['Děkuji','Cảm ơn'],['Prosím','Làm ơn / Xin mời'],['Na shledanou','Tạm biệt'],['Jak se máte?','Bạn khỏe không?'],['Nerozumím','Tôi không hiểu']]}]);
 lessons.forEach(l=>l.items=l.items.map(norm));
 let pendingEx={};
-let S=Object.assign({loop:false,batAsked:false,say:'both',order:'cs',name:'Robert',char:'bear',fairy:'star',last:0,days:[],bd:[],lastId:0,srv:'',tok:'',rate:1,rep:1,gap:1,ex:false,lang:'cs',voices:{}},load('settings',{}));
+let S=Object.assign({loop:false,batAsked:false,say:'both',order:'cs',name:DEFNAME,char:'bear',fairy:'star',last:0,days:[],bd:[],lastId:0,srv:'',tok:'',rate:1,rep:1,gap:1,ex:false,lang:'cs',voices:{}},load('settings',{}));
 if(S.rep>3)S.rep=3;
-if(!S.tok)S.tok='nghe-9ce853e98f5c';
+if(!S.tok&&!TYNA)S.tok='nghe-9ce853e98f5c';
 if(!S.srv&&window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())S.srv='https://nghe-tu-vung.onrender.com';
 let cur=null,playing=false,token=0,idx=-1,voicesList=[],mode='cards',fc={i:0,flip:false,order:null},editIt=null,filter='all',sel=null;
 const persist=()=>{save('lessons',lessons);if(typeof schedulePush==='function')schedulePush()},persistS=()=>save('settings',S);
@@ -151,7 +151,7 @@ function sheetToLessons(rows){const out=new Map();
     out.get(k).items.push({w,m:m||'',ex:ex.filter(Boolean).join(', ')})});
   return [...out.values()]}
 // ---- Cầu nối Google Sheet: đọc + ghi hai chiều ----
-const BRIDGE='https://script.google.com/macros/s/AKfycbyfjpFinRbigdNHqRpLOzzAwWq9yiGQiUcaQLXC4ds6bYCMLp5H_w1TqoYGptkQYGau/exec',BKEY_EMBED='',SNAPK='snap',SEP='\u0001';
+const BRIDGE=TYNA?'':'https://script.google.com/macros/s/AKfycbyfjpFinRbigdNHqRpLOzzAwWq9yiGQiUcaQLXC4ds6bYCMLp5H_w1TqoYGptkQYGau/exec',BKEY_EMBED='',SNAPK='snap',SEP='\u0001';
 var pushT=0,pushing=false;
 const bkey=()=>S.bkey||BKEY_EMBED;
 const isSample=l=>l.id===1&&l.title==='Mẫu: Chào hỏi';
@@ -187,7 +187,7 @@ async function sheetRows(){
   try{return csvParse(await sheetText())}catch(e){throw be||e}}
 let syncing=false;
 async function syncSheet(manual){
-  if(syncing)return;syncing=true;
+  if(TYNA||syncing)return;syncing=true;
   try{
     await pushNow(false);                       // đẩy thay đổi còn dở trước khi kéo về
     const rows=await sheetRows(),fresh=sheetToLessons(rows);

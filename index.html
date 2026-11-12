@@ -47,6 +47,8 @@
   <label class="hint" style="margin-top:14px;display:block">Chuyển bài học sang điện thoại khác (ví dụ từ Android sang iPhone):</label>
   <div style="display:flex;gap:8px"><button class="btn sec grow" id="expBtn">Xuất dữ liệu</button><button class="btn sec grow" id="impBtn">Nhập dữ liệu</button></div>
   <input type="file" id="impIn" accept=".json,application/json" hidden>
+  <label class="hint" style="margin-top:14px;display:block">Hồ sơ đang dùng: <b id="profName"></b></label>
+  <button class="btn sec grow" style="width:100%" id="swProfile">Đổi hồ sơ (Bố / Tyna)</button>
   <button class="btn grow" style="width:100%;margin-top:10px" id="closeSet">Xong</button>
 </div></div>
 
@@ -98,8 +100,5 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
-<script src="js/core.js"></script>
-<script src="js/tts.js"></script>
-<script src="js/content.js"></script>
-<script src="js/views.js"></script>
+<script src="js/profile.js"></script>
 </body></html>
