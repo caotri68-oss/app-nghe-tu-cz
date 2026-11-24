@@ -130,6 +130,7 @@ header h1 .ic{width:26px;height:26px}
 .loopbtn .ic{width:16px;height:16px}.loopbtn.on{background:var(--p-soft);color:var(--p)}
 .mode.m4 .btn{flex:1;padding:9px 4px;font-size:13px;white-space:nowrap}.mode.m4 .btn .ic{width:1.1em;height:1.1em;margin-right:3px}
 .gh{display:flex;align-items:flex-start;gap:8px;justify-content:space-between}.gh b{font-size:17px}
+.gtb{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}.gck{width:22px;height:22px;margin-right:8px;flex:none;accent-color:var(--p)}
 .gact{display:flex;gap:2px;flex:none}.gact button{background:none;border:0;padding:2px 6px;color:var(--mut)}.gact .ic{width:24px;height:24px;margin:0}
 .gbody{margin:8px 0;white-space:pre-wrap;line-height:1.6}
 .gctl{padding:10px 12px;margin-bottom:10px}.gcr{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}.gcr>span{font-size:13px;color:var(--mut);font-weight:700;min-width:60px}.gcr b{min-width:58px;text-align:center}
@@ -595,7 +596,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
-const APP_VER='v1 · 24.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
+const APP_VER='v2 · 25.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],vi:['Tiếng Việt','vi-VN','vie']};
 
 const face=(x,y,s=1)=>`<circle cx="${x-3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><circle cx="${x+3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><path d="M${x-1.5*s} ${y+2*s}q${1.5*s} ${1.5*s} ${3*s} 0" stroke="#3b2f55" stroke-width="${.9*s}" fill="none" stroke-linecap="round"/><circle cx="${x-5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/><circle cx="${x+5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/>`;
@@ -1414,7 +1415,9 @@ function bindGCtl(L){
   if(mi)mi.onclick=()=>{const n=gNv();S.gN=n===0?30:Math.max(2,n-1);re()};
   if(pl)pl.onclick=()=>{const n=gNv();if(n===0)return;S.gN=n>=99?(S.gRm==='all'?0:99):n+1;re()};
 }
+let gSel=null,gSelL='';
 function gramBuild(L){
+  const gck=gi=>gSel?`<input type="checkbox" class="gck" ${gSel.has(gi)?'checked':''}>`:'';
   const segs=[],ranges=[],G=L.grammar||[];let ln=0;
   const add=(text,lang,pause,ids,gi)=>{const say=gSay(text);if(!hasLetter(say))return -1;const i=segs.length;segs.push({text:say,lang,pause,i,ln,c:gi});if(ids)ids.push(i);return i};
   const ks=G.map((p,k)=>k),order=ks.filter(k=>!isBT(G[k])).concat(ks.filter(k=>isBT(G[k])));
@@ -1436,14 +1439,14 @@ function gramBuild(L){
         if(segs.length>b0)segs[segs.length-1].pause=600;return h}).join('\n');
       ranges[gi]=[a,segs.length];
       const canSplit=!!splitGram(p.text,p.title);
-      return pre+`<div class="card gp ${gOpen.has(gk)?'':'col'}" data-gk="${gk}"><div class="gh"><b data-seg="${idT.join(' ')}">${tag}${esc(title.replace(/[\[\]]/g,''))}</b><span class="gact">${canSplit?`<button data-gx="${gi}" style="font-size:13px;color:var(--p);font-weight:600">Tách mục</button>`:''}<button data-gs="${gi}">${I.speaker}</button><button data-ge="${gi}">${I.pencil}</button><span class="gchev">▾</span></span></div><div class="gc"><div class="story" style="font-size:16px;line-height:1.75">${body}</div></div></div>`}
+      return pre+`<div class="card gp ${gOpen.has(gk)?'':'col'}" data-gk="${gk}"><div class="gh">${gck(gi)}<b data-seg="${idT.join(' ')}">${tag}${esc(title.replace(/[\[\]]/g,''))}</b><span class="gact">${canSplit?`<button data-gx="${gi}" style="font-size:13px;color:var(--p);font-weight:600">Tách mục</button>`:''}<button data-gs="${gi}">${I.speaker}</button><button data-gd="${gi}" aria-label="Xoá">${I.trash}</button><button data-ge="${gi}">${I.pencil}</button><span class="gchev">▾</span></span></div><div class="gc"><div class="story" style="font-size:16px;line-height:1.75">${body}</div></div></div>`}
     const a=segs.length,idT=[],idB=[];
     ln++;add(p.title,L.b,500,idT,gi);
     (p.body||'').split(/\n+/).forEach(par=>{ln++;add(par,L.b,500,idB,gi)});
     const exs=(p.ex||[]).map(e=>{const ids=[];ln++;add(e.cs,L.a,700,ids,gi);add(e.vi,L.b,900,ids,gi);
       return `<div class="gex" data-seg="${ids.join(' ')}"><div class="cs">${esc(e.cs)}</div><div class="vi">${esc(e.vi||'')}</div></div>`}).join('');
     ranges[gi]=[a,segs.length];
-    return pre+`<div class="card gp ${gOpen.has(gk)?'':'col'}" data-gk="${gk}"><div class="gh"><b data-seg="${idT.join(' ')}">${tag}${esc(p.title)}</b><span class="gact"><button data-gs="${gi}">${I.speaker}</button><button data-ge="${gi}">${I.pencil}</button><span class="gchev">▾</span></span></div><div class="gc"><div class="gbody" data-seg="${idB.join(' ')}">${esc(p.body||'')}</div>${exs}</div></div>`}).join('')+(exH?'</div>':'');
+    return pre+`<div class="card gp ${gOpen.has(gk)?'':'col'}" data-gk="${gk}"><div class="gh">${gck(gi)}<b data-seg="${idT.join(' ')}">${tag}${esc(p.title)}</b><span class="gact"><button data-gs="${gi}">${I.speaker}</button><button data-gd="${gi}" aria-label="Xoá">${I.trash}</button><button data-ge="${gi}">${I.pencil}</button><span class="gchev">▾</span></span></div><div class="gc"><div class="gbody" data-seg="${idB.join(' ')}">${esc(p.body||'')}</div>${exs}</div></div>`}).join('')+(exH?'</div>':'');
   return {segs,ranges,html,order};
 }
 // ----- Câu chuyện: [ngoặc vuông] + tự nhận biết từ có trong bài -----
@@ -1488,11 +1491,15 @@ function bindModes(){
   if($('#mGram'))$('#mGram').onclick=()=>{mode='gram';sel=null;lesson()};
   if($('#mStory'))$('#mStory').onclick=()=>{mode='story';sel=null;lesson()};
 }
+function gTb(n){
+  if(gSel)return `<div class="gtb"><button class="chip" id="gSA">Chọn tất cả</button><button class="chip" id="gSD" style="color:#c0392b">🗑 Xoá ${gSel.size} mục</button><button class="chip" id="gSC">Huỷ</button></div>`;
+  return `<div class="gtb">${n>1?'<button class="chip" id="gAll">Mở hết</button>':''}<button class="chip" id="gSel">☑ Chọn để xoá</button><button class="chip" id="gWipe" style="color:#c0392b">🗑 Xoá toàn bộ</button></div>`}
 function lessonExtra(head,modes,L){
+  if(gSelL!==L.id||mode!=='gram')gSel=null;gSelL=L.id;
   const isG=mode==='gram',B=isG?gramBuild(L):storyBuild(L),list=isG?(L.grammar||[]):(L.stories||[]);
   const hint='Bấm "Thêm ngữ pháp", dán nội dung của bạn vào rồi lưu. App giữ nguyên chữ bạn dán. Bấm loa để nghe, chạm chữ tím để nghe riêng. Chạm một mục để mở dài ra hoặc thu gọn lại.';
   const empty=`<div class="empty"><span class="kao">${isG?'(・・ ) ?':''}</span>${isG?'Chưa có ghi chú ngữ pháp nào trong bài này.':'Chưa có câu chuyện nào trong bài này.'}<br>Bấm nút bên trên để dán vào nhé!</div>`;
-  $('#app').innerHTML=head+`<main>${modes}<button class="btn" style="width:100%;padding:12px 8px;margin-bottom:10px" id="xAdd">${I.plus} Thêm ngữ pháp (dán nội dung)</button><p class="hint" style="margin:0 0 12px">${hint}</p>${isG&&list.length?gCtl(L):''}${isG&&list.length>1?'<button class="chip" id="gAll" style="margin-bottom:10px">Mở hết</button>':''}${list.length?B.html:empty}</main>
+  $('#app').innerHTML=head+`<main>${modes}<button class="btn" style="width:100%;padding:12px 8px;margin-bottom:10px" id="xAdd">${I.plus} Thêm ngữ pháp (dán nội dung)</button><p class="hint" style="margin:0 0 12px">${hint}</p>${isG&&list.length?gCtl(L):''}${isG&&list.length?gTb(list.length):''}${list.length?B.html:empty}</main>
   <div class="player"><div class="row"><button class="btn play" id="playBtn">${I.play}</button><div class="grow">${isG?'<div id="gCnt" style="font-size:13px;font-weight:700;color:var(--p);min-height:0"></div>':''}${rateBlock()}</div></div></div>`;
   bindModes();
   $('#rate').oninput=e=>setRate(+e.target.value,false);$('#rate').onchange=e=>setRate(+e.target.value,true);
@@ -1514,9 +1521,22 @@ function lessonExtra(head,modes,L){
     const g=L.grammar[k],parts=splitGram(g.text,g.title);if(!parts)return;
     if(!await dlg({title:'Tách thành '+parts.length+' mục?',msg:'Ghi chú này sẽ được chia thành từng mục riêng theo đề mục.',ok:'Tách'}))return;
     L.grammar.splice(k,1,...parts);persist();lesson();toast('Đã tách thành '+parts.length+' mục')});
+  if(isG){
+    part('data-gd',async k=>{if(!await dlg({title:'Xoá điểm ngữ pháp này?',msg:gCleanT(L.grammar[k].title)||'Ghi chú',ok:'Xoá',danger:true}))return;
+      L.grammar.splice(k,1);persist();lesson();toast('Đã xoá')});
+    const on=(id,fn)=>{const e=$(id);if(e)e.onclick=fn};
+    on('#gSel',()=>{gSel=new Set();lesson()});
+    on('#gSC',()=>{gSel=null;lesson()});
+    on('#gSA',()=>{const n=L.grammar.length;gSel=gSel.size===n?new Set():new Set(L.grammar.map((_,i)=>i));lesson()});
+    on('#gSD',async()=>{if(!gSel.size)return toast('Chạm vào các mục muốn xoá trước nhé');
+      if(!await dlg({title:'Xoá '+gSel.size+' mục ngữ pháp?',msg:'Không khôi phục được.',ok:'Xoá',danger:true}))return;
+      const n=gSel.size;L.grammar=L.grammar.filter((_,i)=>!gSel.has(i));gSel=null;persist();lesson();toast('Đã xoá '+n+' mục')});
+    on('#gWipe',async()=>{if(!await dlg({title:'Xoá TOÀN BỘ ngữ pháp?',msg:L.grammar.length+' mục trong "'+L.title+'" sẽ bị xoá, không khôi phục được.',ok:'Xoá hết',danger:true}))return;
+      L.grammar=[];gSel=null;persist();lesson();toast('Đã xoá toàn bộ ngữ pháp')})}
   if(isG){const cards=[...document.querySelectorAll('.gp')],allBtn=$('#gAll');
     const upd=()=>{if(allBtn)allBtn.textContent=cards.every(c=>!c.classList.contains('col'))?'Thu hết':'Mở hết'};
     cards.forEach(c=>c.onclick=ev=>{if(ev.target.closest('button'))return;const k=c.dataset.gk;
+      if(gSel){const gi=+k.slice(k.lastIndexOf('|')+1);gSel.has(gi)?gSel.delete(gi):gSel.add(gi);const ck=c.querySelector('.gck');if(ck)ck.checked=gSel.has(gi);const b=$('#gSD');if(b)b.textContent='🗑 Xoá '+gSel.size+' mục';return}
       if(c.classList.contains('col')){c.classList.remove('col');gOpen.add(k)}
       else if(ev.target.closest('.gh')){c.classList.add('col');gOpen.delete(k)}
       upd()});
