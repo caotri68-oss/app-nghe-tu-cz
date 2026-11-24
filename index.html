@@ -544,6 +544,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
   <label class="hint" style="margin-top:14px;display:block">Chuyển bài học sang điện thoại khác (ví dụ từ Android sang iPhone):</label>
   <div style="display:flex;gap:8px"><button class="btn sec grow" id="expBtn">Xuất dữ liệu</button><button class="btn sec grow" id="impBtn">Nhập dữ liệu</button></div>
   <input type="file" id="impIn" accept=".json,application/json" hidden>
+  <p class="hint" id="verTxt" style="text-align:center;margin:12px 0 0"></p>
   <button class="btn grow" style="width:100%;margin-top:10px" id="closeSet">Xong</button>
 </div></div>
 
@@ -594,6 +595,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
+const APP_VER='v1 · 24.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],vi:['Tiếng Việt','vi-VN','vie']};
 
 const face=(x,y,s=1)=>`<circle cx="${x-3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><circle cx="${x+3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><path d="M${x-1.5*s} ${y+2*s}q${1.5*s} ${1.5*s} ${3*s} 0" stroke="#3b2f55" stroke-width="${.9*s}" fill="none" stroke-linecap="round"/><circle cx="${x-5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/><circle cx="${x+5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/>`;
@@ -1744,7 +1746,7 @@ function home(){
   ${dueN?`<div class="card lesson star" id="dueCard" style="--h:15"><div class="em"><span>${I.reset}</span></div><div><b>Cần ôn hôm nay</b><small>${dueN} từ đến hạn ôn lại</small></div><span class="go">${I.chev}</span></div>`:''}
   ${star.items.length?`<div class="card lesson star" id="starCard" style="--h:45"><div class="em"><span>${I.star}</span><img class="lic" src="fairy-star.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"></div><div><b>Sổ ôn riêng</b><small>${star.items.length?`${star.items.length} từ cần ôn lại · Đã thuộc ${sk}`:'Vào bài, bấm "Chọn" để thêm từ chưa thuộc'}</small>${star.items.length?`<div class="prog"><i style="width:${sk/star.items.length*100}%"></i></div>`:''}</div><span class="go">${I.chev}</span></div>`:''}
   ${list.length?homeCards(list,card):`<div class="empty2"><div class="big2"><div class="av3d m-${m}">${charSvg(S.char)}</div></div>Chưa có bài ${LANGS[S.lang][0]} nào.<br>Bấm nút + để thêm bài đầu tiên nhé!</div>`}
-  <button class="btn sec" style="width:100%;margin-bottom:10px" id="syncBtn">${I.search} Đồng bộ với Google Sheet</button></main>
+  <button class="btn sec" style="width:100%;margin-bottom:10px" id="syncBtn">${I.search} Đồng bộ với Google Sheet</button><p class="hint" style="text-align:center;margin:6px 0 0">Phiên bản <b>${APP_VER}</b></p></main>
   <button class="btn fab" id="fabAdd">${I.plus}</button>${navHtml('home')}`;
     $('#fabAdd').onclick=openAdd;$('#openSet').onclick=openSet;$('#syncBtn').onclick=async()=>{if(!bkey()){const v=await dlg({title:'Nhập mã ghi để lưu từ vựng lên Google Sheet',msg:'Chỉ nhập một lần trên máy này. Bỏ trống nếu chỉ muốn tải từ vựng về.',input:'',ok:'Lưu'});if(v){S.bkey=v;persistS()}}syncSheet(true)};
   $('#goBtn').onclick=goStudy;$('#goProf').onclick=()=>openProfiles(false);{const dc=$('#dueCard');if(dc)dc.onclick=()=>{cur=makeDue();mode='fc';filter='all';fc={i:0,flip:false,order:null,say:true};lesson()}}
@@ -1893,7 +1895,7 @@ function openSet(){
   $('#exOn').onchange=e=>{S.ex=e.target.checked;persistS()};
   $('#setModal').classList.add('show');
 }
-$('#expBtn').onclick=exportData;$('#impBtn').onclick=()=>$('#impIn').click();
+$('#verTxt').innerHTML='Phiên bản <b>'+APP_VER+'</b>';$('#expBtn').onclick=exportData;$('#impBtn').onclick=()=>$('#impIn').click();
 $('#impIn').onchange=e=>{const f=e.target.files[0];if(f)importData(f);e.target.value=''};
 $('#closeSet').onclick=()=>{$('#setModal').classList.remove('show');if(cur)lesson()};
 
