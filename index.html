@@ -596,7 +596,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
-const APP_VER='v5 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
+const APP_VER='v6 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],vi:['Tiếng Việt','vi-VN','vie']};
 
 const face=(x,y,s=1)=>`<circle cx="${x-3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><circle cx="${x+3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><path d="M${x-1.5*s} ${y+2*s}q${1.5*s} ${1.5*s} ${3*s} 0" stroke="#3b2f55" stroke-width="${.9*s}" fill="none" stroke-linecap="round"/><circle cx="${x-5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/><circle cx="${x+5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/>`;
@@ -791,7 +791,9 @@ async function pushNow(manual){
     saveSnap(rowsOf(lessons));
     if(manual)toast(`Đã lưu ${ops.length} thay đổi lên Google Sheet`);
     return ops.length}
-  catch(e){if(manual)toast('Chưa lưu được lên Sheet: '+(e&&e.message||e));return -1}
+  catch(e){const m=String(e&&e.message||e);
+    if(/Sai mã/i.test(m)&&S.bkey){S.bkey='';persistS();if(manual)toast('Mã ghi bạn nhập bị SAI nên mình đã xoá nó. Bấm ⬆ Đưa lên Sheet và nhập lại đúng mã (dán, không gõ tay).');return -1}
+    if(manual)toast('Chưa lưu được lên Sheet: '+m);return -1}
   finally{pushing=false}}
 async function sheetRows(){
   if(BRIDGE){try{const r=await fetch(BRIDGE+'?action=read&t='+Date.now(),{cache:'no-store'});const j=await r.json();
