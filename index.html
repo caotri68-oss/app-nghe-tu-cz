@@ -596,7 +596,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
-const APP_VER='v6 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
+const APP_VER='v7 · 27.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],vi:['Tiếng Việt','vi-VN','vie']};
 
 const face=(x,y,s=1)=>`<circle cx="${x-3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><circle cx="${x+3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><path d="M${x-1.5*s} ${y+2*s}q${1.5*s} ${1.5*s} ${3*s} 0" stroke="#3b2f55" stroke-width="${.9*s}" fill="none" stroke-linecap="round"/><circle cx="${x-5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/><circle cx="${x+5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/>`;
@@ -757,7 +757,7 @@ function sheetToLessons(rows){const out=new Map();
     out.get(k).items.push({w,m:m||'',ex:ex.filter(Boolean).join(', ')})});
   return [...out.values()]}
 // ---- Cầu nối Google Sheet: đọc + ghi hai chiều ----
-const BRIDGE='https://script.google.com/macros/s/AKfycbxgpeWMsmi0aBYiUpb2S_Mtu5bYX5lpGoy4fRzIKVPuK1PT2Of0XlpS9FVJ7Uoh4p6z/exec',BKEY_EMBED='',SNAPK='snap',SEP='\u0001';
+const BRIDGE='https://script.google.com/macros/s/AKfycbxgpeWMsmi0aBYiUpb2S_Mtu5bYX5lpGoy4fRzIKVPuK1PT2Of0XlpS9FVJ7Uoh4p6z/exec',BKEY_EMBED='tv-a7a822b845eb',SNAPK='snap',SEP='\u0001';
 var pushT=0,pushing=false;
 const bkey=()=>S.bkey||BKEY_EMBED;
 const isSample=l=>l.id===1&&l.title==='Mẫu: Chào hỏi';
@@ -775,7 +775,7 @@ function diffOps(){const snap=load(SNAPK,null);if(snap===null)return null;
   return ops}
 function pendTxt(){let n=0;try{const o=diffOps();n=o?o.length:0}catch(e){}
   if(!n)return '';
-  return `<p class="hint" style="text-align:center;margin:4px 0 0;color:#c0392b">⚠ ${n} thay đổi chưa lưu lên Google Sheet${bkey()?'. Bấm Đồng bộ.':' (máy này chưa có mã ghi, bấm Đồng bộ để nhập)'}</p>`}
+  return `<p class="hint" style="text-align:center;margin:4px 0 0;color:#c0392b">⚠ ${n} thay đổi chưa lưu lên Google Sheet${bkey()?'. Bấm Đồng bộ.':' (máy này chưa có quyền ghi)'}</p>`}
 function schedulePush(){clearTimeout(pushT);pushT=setTimeout(()=>pushNow(false),1500)}
 async function pushNow(manual){
   if(pushing||!BRIDGE||!bkey())return 0;
@@ -836,7 +836,7 @@ async function syncSheet(manual,quiet){
     const n=await pushNow(false);               // bài chỉ có trong máy → đẩy lên Sheet
     if(!cur)home();
     const pend=(()=>{try{const o=diffOps();return o?o.length:0}catch(e){return 0}})();
-    if(manual&&pend>0&&!bkey())toast(`⚠ ${pend} thay đổi của máy này CHƯA lên Google Sheet vì máy chưa có mã ghi. Bấm Đồng bộ lại và nhập mã ghi.`);
+    if(manual&&pend>0&&!bkey())toast(`⚠ ${pend} thay đổi của máy này CHƯA lên Google Sheet vì máy chưa có mã ghi. Cần cài lại bản app mới.`);
     else if(manual&&!quiet)toast(n>0?`Đã đồng bộ, lưu thêm ${n} thay đổi lên Sheet`:`Đã đồng bộ ${fresh.length} bài từ Google Sheet`)}
   catch(e){syncSheet.err=true;if(manual)toast('Không đồng bộ được: '+(e&&e.message||e))}
   syncing=false}
@@ -847,8 +847,7 @@ const stText=()=>`⬆ Đưa lên: ${fmtT(S.lastUp)} · ⬇ Tải về: ${fmtT(S.
 const stRefresh=()=>{const e=$('#syncSt');if(e)e.textContent=stText()};
 const nWord=()=>[...rowsOf(lessons).keys()].length;
 async function doUp(){
-  if(!bkey()){const v=await dlg({title:'Nhập mã ghi để đưa lên Google Sheet',msg:'Chỉ nhập một lần trên máy này. Mã này chỉ lưu trong máy, không đưa lên web công khai.',input:'',ok:'Lưu'});
-    if(!v)return toast('Chưa có mã ghi nên chưa đưa lên Sheet được');S.bkey=v;persistS()}
+  if(!bkey())return toast('App thiếu mã ghi, cần cài lại bản mới');
   if(pushing||syncing)return toast('Đang đồng bộ, đợi một chút rồi bấm lại nhé');
   toast('Đang đưa lên Google Sheet…');
   try{
@@ -865,13 +864,14 @@ async function doUp(){
   }catch(e){toast('Chưa đưa lên được: '+(e&&e.message||e))}}
 async function doDown(){
   if(syncing||pushing)return toast('Đang đồng bộ, đợi một chút rồi bấm lại nhé');
-  const t0=new Set(lessons.map(l=>String(l.title||'').trim()+'|'+(l.a||'cs'))),w0=nWord();
+  const t0=new Set(lessons.map(l=>String(l.title||'').trim()+'|'+(l.a||'cs'))),b0=new Map([...rowsOf(lessons)].map(([k,r])=>[k,sigOf(r)]));
   await syncSheet(true,true);
   if(syncing)return;
   if(syncSheet.err)return;                       // đã báo lỗi
-  const t1=lessons.filter(l=>!t0.has(String(l.title||'').trim()+'|'+(l.a||'cs'))).length,w1=nWord();
+  const t1=lessons.filter(l=>!t0.has(String(l.title||'').trim()+'|'+(l.a||'cs'))).length,b1=rowsOf(lessons);
+  let ad=0,ch=0,rm=0;b1.forEach((r,k)=>{if(!b0.has(k))ad++;else if(b0.get(k)!==sigOf(r))ch++});b0.forEach((v,k)=>{if(!b1.has(k))rm++});
   S.lastDown=Date.now();persistS();stRefresh();
-  toast(t1||w1!==w0?`✅ Đã tải về: ${t1} bài mới, ${w1-w0>=0?'+':''}${w1-w0} từ (tổng ${w1} từ)`:`✅ Đã tải về, máy này đã có đủ (${w1} từ)`)}
+  toast(ad||ch||rm||t1?`✅ Đã tải bản mới: ${t1} bài mới, ${ad} từ mới, ${ch} từ sửa${rm?`, ${rm} từ bỏ`:''} (tổng ${b1.size} từ)`:`✅ Máy này đã là bản mới nhất (${b1.size} từ)`)}
 
 // ---- Ngữ pháp dùng chung qua Google Sheet (tab 'Ngữ pháp') ----
 const GSNAPK='gsnap';
@@ -2089,7 +2089,7 @@ const syncAll=()=>syncSheet(false).then(()=>syncProg(false));
 syncAll();
 if(!S.pid)openProfiles(true);
 window.addEventListener('online',syncAll);
-setInterval(()=>{if(!document.hidden&&!playing&&!gAct&&!cur&&!syncing&&!pushing)syncAll()},60000);
+setInterval(()=>{if(!document.hidden&&!playing&&!gAct&&!cur&&!syncing&&!pushing)syncAll()},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncAll()});
 if(TTS){hookNative();TTS.info().then(o=>{if(o.playing){playing=true;updPlay()}}).catch(()=>{})}
 // nhận link được chia sẻ từ app khác (Facebook, TikTok, YouTube...)
