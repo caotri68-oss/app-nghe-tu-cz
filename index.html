@@ -596,7 +596,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
-const APP_VER='v3 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
+const APP_VER='v4 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],vi:['Tiếng Việt','vi-VN','vie']};
 
 const face=(x,y,s=1)=>`<circle cx="${x-3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><circle cx="${x+3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><path d="M${x-1.5*s} ${y+2*s}q${1.5*s} ${1.5*s} ${3*s} 0" stroke="#3b2f55" stroke-width="${.9*s}" fill="none" stroke-linecap="round"/><circle cx="${x-5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/><circle cx="${x+5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/>`;
@@ -832,7 +832,9 @@ async function syncSheet(manual){
     try{await pushGram(manual);await pullGram()}catch(e){}
     const n=await pushNow(false);               // bài chỉ có trong máy → đẩy lên Sheet
     if(!cur)home();
-    if(manual)toast(n>0?`Đã đồng bộ, lưu thêm ${n} thay đổi lên Sheet`:`Đã đồng bộ ${fresh.length} bài từ Google Sheet`)}
+    const pend=(()=>{try{const o=diffOps();return o?o.length:0}catch(e){return 0}})();
+    if(manual&&pend>0&&!bkey())toast(`⚠ ${pend} thay đổi của máy này CHƯA lên Google Sheet vì máy chưa có mã ghi. Bấm Đồng bộ lại và nhập mã ghi.`);
+    else if(manual)toast(n>0?`Đã đồng bộ, lưu thêm ${n} thay đổi lên Sheet`:`Đã đồng bộ ${fresh.length} bài từ Google Sheet`)}
   catch(e){if(manual)toast('Không đồng bộ được: '+(e&&e.message||e))}
   syncing=false}
 // ---- Ngữ pháp dùng chung qua Google Sheet (tab 'Ngữ pháp') ----
@@ -1168,10 +1170,12 @@ async function playSpeech(start){
   }
   if(tk===token){playing=false;idx=-1;mark(-1);updPlay()}
 }
-function stopPlay(){token++;playing=false;gAct=false;if(au&&!au.paused){au._silent=false;au.pause()}if(TTS){TTS.stop().catch(()=>{})}else if('speechSynthesis' in window)speechSynthesis.cancel();updPlay()}
+function stopPlay(){stopAt=Date.now();token++;playing=false;gAct=false;if(au&&!au.paused){au._silent=false;au.pause()}if(TTS){TTS.stop().catch(()=>{})}else if('speechSynthesis' in window)speechSynthesis.cancel();updPlay()}
 function mark(i){idx=i;document.querySelectorAll('.pair').forEach((e,k)=>e.classList.toggle('on',k===i));const e=document.querySelectorAll('.pair')[i];if(e)e.scrollIntoView({block:'center',behavior:'smooth'})}
 let gAct=false;
-function updPlay(){const b=$('#playBtn');if(b){const on=playing||gAct;b.innerHTML=on?I.stop:I.play;b.title=on?'Dừng':'Nghe'}}
+let stopAt=0;
+const spk=()=>{try{return Date.now()-stopAt>800&&'speechSynthesis' in window&&speechSynthesis.speaking}catch(e){return false}},isOn=()=>playing||gAct||spk();
+function updPlay(){const b=$('#playBtn');if(b){const on=isOn();b.innerHTML=on?I.stop:I.play;b.title=on?'Dừng':'Nghe'}}
 async function speakOne(i){stopPlay();const tk=++token;mark(i);await sayItem(view()[i],cur,tk,true)}
 
 // ---------- Phát bằng file âm thanh (bản web/iPhone: nghe được khi khoá màn hình) ----------
@@ -1222,7 +1226,7 @@ async function playAudio(start){
   playing=true;updPlay();mark(start);
   let res;
   try{res=await lessonAudio(body,key)}
-  catch(e){a._silent=false;playing=false;updPlay();toast('Chưa tạo được âm thanh ('+e.message+'). Đọc tạm bằng giọng của máy, khoá màn hình sẽ dừng.');return playSpeech(start)}
+  catch(e){a._silent=true;try{a.pause()}catch(_){}playing=false;updPlay();toast('Chưa tạo được âm thanh ('+e.message+'). Đọc tạm bằng giọng của máy, khoá màn hình sẽ dừng.');return playSpeech(start)}
   if(!playing)return;
   if(a._url)URL.revokeObjectURL(a._url);
   a._url=URL.createObjectURL(res.blob);auKey=key;auMarks=res.marks;auList=list;auTitle=L.title;
@@ -1283,7 +1287,7 @@ async function playSegs(segs,title,o){
   return playSegSpeech(segs,o);
 }
 async function playSegSpeech(segs,o){
-  o=o||{};stopPlay();segCb=o.cb||segHL;const cb=segCb,tk=++token;playing=true;updPlay();
+  o=o||{};stopPlay();segCb=o.cb||segHL;const cb=segCb,tk=++token;playing=true;gAct=true;updPlay();
   do{for(const s of segs){if(tk!==token)break;cb(s.i);await speak(s.text,s.lang,tk);if(tk!==token)break;await wait(s.pause,tk)}}while(o.loop&&tk===token);
   if(tk===token){playing=false;gAct=false;updPlay();cb(-1)}
 }
@@ -1294,7 +1298,7 @@ async function playSegAudio(segs,title){
   playing=true;updPlay();
   let res;
   try{res=await lessonAudio(body,key,'/api/tts-segments')}
-  catch(e){a._silent=false;playing=false;updPlay();toast('Chưa tạo được âm thanh ('+e.message+'). Đọc tạm bằng giọng của máy, khoá màn hình sẽ dừng.');return playSegSpeech(segs,{cb:segCb})}
+  catch(e){a._silent=true;try{a.pause()}catch(_){}playing=false;updPlay();toast('Chưa tạo được âm thanh ('+e.message+'). Đọc tạm bằng giọng của máy, khoá màn hình sẽ dừng.');return playSegSpeech(segs,{cb:segCb})}
   if(!playing)return;
   if(a._url)URL.revokeObjectURL(a._url);
   a._url=URL.createObjectURL(res.blob);auKey=key;auMarks=res.marks;auList=segs.map(s=>({w:s.text,m:''}));auTitle=title;
@@ -1521,7 +1525,7 @@ function lessonExtra(head,modes,L){
     let m=S.gRm||'off';const n=gNv();if(one&&m==='card')m='all';
     const inf=m==='all'&&n===0,N=(m==='off'||inf)?1:(n||10);
     playSegs(gramExpand(sg,m==='off'?'all':m,N),L.title+' · Ngữ pháp',{cb:gramCb(N,inf),loop:inf})};
-  $('#playBtn').onclick=()=>{if(playing||gAct){stopPlay();const c=$('#gCnt');if(c)c.textContent='';return}
+  $('#playBtn').onclick=()=>{if(isOn()){stopPlay();const c=$('#gCnt');if(c)c.textContent='';return}
     if(!isG)return playSegs(B.segs,L.title+' · Truyện');
     const w=(L.grammar||[]).some(isBT)?(S.gWhat||'gram'):'both';
     if(w!=='gram'&&!S.gExOpen&&$('#gExT'))$('#gExT').click();
@@ -1850,7 +1854,7 @@ function lesson(){screen='lesson';S.last=Date.now();{const t=dstr(new Date());S.
       $('#sDone').onclick=()=>{sel=null;lesson()};
     }else{
       $('#rate').oninput=e=>setRate(+e.target.value,false);$('#rate').onchange=e=>setRate(+e.target.value,true);
-      $('#playBtn').onclick=()=>playing?stopPlay():playFrom(Math.max(idx,0));
+      $('#playBtn').onclick=()=>isOn()?stopPlay():playFrom(Math.max(idx,0));
       $('#howBtn').onclick=openHow;
       document.querySelectorAll('.pair .hid').forEach(e=>e.onclick=ev=>{ev.stopPropagation();e.classList.remove('hid')});
       document.querySelectorAll('.pair .sp').forEach(b=>b.onclick=e=>{e.stopPropagation();speakOne(+b.dataset.k)});
