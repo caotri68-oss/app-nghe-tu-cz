@@ -596,7 +596,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
-const APP_VER='v4 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
+const APP_VER='v5 · 26.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],vi:['Tiếng Việt','vi-VN','vie']};
 
 const face=(x,y,s=1)=>`<circle cx="${x-3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><circle cx="${x+3*s}" cy="${y}" r="${1.1*s}" fill="#3b2f55"/><path d="M${x-1.5*s} ${y+2*s}q${1.5*s} ${1.5*s} ${3*s} 0" stroke="#3b2f55" stroke-width="${.9*s}" fill="none" stroke-linecap="round"/><circle cx="${x-5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/><circle cx="${x+5*s}" cy="${y+1.8*s}" r="${1.3*s}" fill="#FF8FB8" opacity=".75"/>`;
@@ -798,8 +798,8 @@ async function sheetRows(){
     if(!j.ok)throw new Error(j.error||'lỗi cầu nối');return j.rows}catch(e){var be=e}}
   try{return csvParse(await sheetText())}catch(e){throw be||e}}
 let syncing=false;
-async function syncSheet(manual){
-  if(syncing)return;syncing=true;
+async function syncSheet(manual,quiet){
+  if(syncing)return;syncing=true;syncSheet.err=false;
   try{
     const snap0=load(SNAPK,null);
     await pushNow(false);                       // đẩy thay đổi còn dở trước khi kéo về
@@ -828,15 +828,49 @@ async function syncSheet(manual){
     fk.forEach(f=>next.push(f));
     lessons=next;
     saveSnap(rowsOf(fresh));                    // mốc = đúng nội dung Sheet vừa kéo
+    S.lastDown=Date.now();persistS();
     save('lessons',lessons);if(S.pid)applyProg(S.pid);
     try{await pushGram(manual);await pullGram()}catch(e){}
     const n=await pushNow(false);               // bài chỉ có trong máy → đẩy lên Sheet
     if(!cur)home();
     const pend=(()=>{try{const o=diffOps();return o?o.length:0}catch(e){return 0}})();
     if(manual&&pend>0&&!bkey())toast(`⚠ ${pend} thay đổi của máy này CHƯA lên Google Sheet vì máy chưa có mã ghi. Bấm Đồng bộ lại và nhập mã ghi.`);
-    else if(manual)toast(n>0?`Đã đồng bộ, lưu thêm ${n} thay đổi lên Sheet`:`Đã đồng bộ ${fresh.length} bài từ Google Sheet`)}
-  catch(e){if(manual)toast('Không đồng bộ được: '+(e&&e.message||e))}
+    else if(manual&&!quiet)toast(n>0?`Đã đồng bộ, lưu thêm ${n} thay đổi lên Sheet`:`Đã đồng bộ ${fresh.length} bài từ Google Sheet`)}
+  catch(e){syncSheet.err=true;if(manual)toast('Không đồng bộ được: '+(e&&e.message||e))}
   syncing=false}
+
+// ---- Hai nút riêng: Đưa lên Sheet / Tải về từ Sheet ----
+const fmtT=t=>{if(!t)return 'chưa lần nào';const d=new Date(t),z=n=>String(n).padStart(2,'0');return z(d.getDate())+'/'+z(d.getMonth()+1)+' '+z(d.getHours())+':'+z(d.getMinutes())};
+const stText=()=>`⬆ Đưa lên: ${fmtT(S.lastUp)} · ⬇ Tải về: ${fmtT(S.lastDown)}`;
+const stRefresh=()=>{const e=$('#syncSt');if(e)e.textContent=stText()};
+const nWord=()=>[...rowsOf(lessons).keys()].length;
+async function doUp(){
+  if(!bkey()){const v=await dlg({title:'Nhập mã ghi để đưa lên Google Sheet',msg:'Chỉ nhập một lần trên máy này. Mã này chỉ lưu trong máy, không đưa lên web công khai.',input:'',ok:'Lưu'});
+    if(!v)return toast('Chưa có mã ghi nên chưa đưa lên Sheet được');S.bkey=v;persistS()}
+  if(pushing||syncing)return toast('Đang đồng bộ, đợi một chút rồi bấm lại nhé');
+  toast('Đang đưa lên Google Sheet…');
+  try{
+    if(load(SNAPK,null)===null){                 // máy chưa từng đồng bộ: lấy Sheet làm mốc, chỉ thêm/sửa, không xoá gì
+      const sh=rowsOf(sheetToLessons(await sheetRows())),mine=rowsOf(lessons),o={};
+      sh.forEach((r,k)=>{if(mine.has(k))o[k]=sigOf(r)});save(SNAPK,o)}
+    const ops=(diffOps()||[]),up=ops.filter(x=>x.op==='upsert'),dl=ops.filter(x=>x.op==='delete');
+    const n=await pushNow(true);
+    if(n===-1)return;                            // pushNow đã báo lỗi
+    if(n===-2)return;
+    S.lastUp=Date.now();persistS();stRefresh();
+    const les=new Set(up.map(x=>x.title)).size;
+    toast(n===0?'Không có gì mới để đưa lên, Sheet đã đủ rồi':`✅ Đã đưa lên Sheet: ${up.length} từ thêm/sửa (${les} bài)${dl.length?`, ${dl.length} từ xoá`:''}`)
+  }catch(e){toast('Chưa đưa lên được: '+(e&&e.message||e))}}
+async function doDown(){
+  if(syncing||pushing)return toast('Đang đồng bộ, đợi một chút rồi bấm lại nhé');
+  const t0=new Set(lessons.map(l=>String(l.title||'').trim()+'|'+(l.a||'cs'))),w0=nWord();
+  await syncSheet(true,true);
+  if(syncing)return;
+  if(syncSheet.err)return;                       // đã báo lỗi
+  const t1=lessons.filter(l=>!t0.has(String(l.title||'').trim()+'|'+(l.a||'cs'))).length,w1=nWord();
+  S.lastDown=Date.now();persistS();stRefresh();
+  toast(t1||w1!==w0?`✅ Đã tải về: ${t1} bài mới, ${w1-w0>=0?'+':''}${w1-w0} từ (tổng ${w1} từ)`:`✅ Đã tải về, máy này đã có đủ (${w1} từ)`)}
+
 // ---- Ngữ pháp dùng chung qua Google Sheet (tab 'Ngữ pháp') ----
 const GSNAPK='gsnap';
 const gItems=l=>(l.grammar||[]).map(p=>{const o={title:gCleanT(p.title)||'Ghi chú',text:(p.text!==undefined&&p.body===undefined)?(p.text||''):[p.body||'',...(p.ex||[]).map(e=>e.cs+(e.vi?' — '+e.vi:''))].filter(Boolean).join('\n')};if(p.bt===true||p.bt===false)o.bt=p.bt;return o});
@@ -1783,9 +1817,9 @@ function home(){
   ${dueN?`<div class="card lesson star" id="dueCard" style="--h:15"><div class="em"><span>${I.reset}</span></div><div><b>Cần ôn hôm nay</b><small>${dueN} từ đến hạn ôn lại</small></div><span class="go">${I.chev}</span></div>`:''}
   ${star.items.length?`<div class="card lesson star" id="starCard" style="--h:45"><div class="em"><span>${I.star}</span><img class="lic" src="img/fairy-star.png" alt="" onload="this.parentNode.classList.add('hasimg')" onerror="this.remove()"></div><div><b>Sổ ôn riêng</b><small>${star.items.length?`${star.items.length} từ cần ôn lại · Đã thuộc ${sk}`:'Vào bài, bấm "Chọn" để thêm từ chưa thuộc'}</small>${star.items.length?`<div class="prog"><i style="width:${sk/star.items.length*100}%"></i></div>`:''}</div><span class="go">${I.chev}</span></div>`:''}
   ${list.length?homeCards(list,card):`<div class="empty2"><div class="big2"><div class="av3d m-${m}">${charSvg(S.char)}</div></div>Chưa có bài ${LANGS[S.lang][0]} nào.<br>Bấm nút + để thêm bài đầu tiên nhé!</div>`}
-  <button class="btn sec" style="width:100%;margin-bottom:10px" id="syncBtn">${I.search} Đồng bộ với Google Sheet</button><p class="hint" style="text-align:center;margin:6px 0 0">Phiên bản <b>${APP_VER}</b></p>${pendTxt()}</main>
+  <div style="display:flex;gap:8px;margin-bottom:4px"><button class="btn sec grow" id="upBtn" style="padding:12px 6px">⬆ Đưa lên Sheet</button><button class="btn sec grow" id="downBtn" style="padding:12px 6px">⬇ Tải về từ Sheet</button></div><p class="hint" id="syncSt" style="text-align:center;margin:0 0 10px;font-size:12px">${stText()}</p><p class="hint" style="text-align:center;margin:6px 0 0">Phiên bản <b>${APP_VER}</b></p>${pendTxt()}</main>
   <button class="btn fab" id="fabAdd">${I.plus}</button>${navHtml('home')}`;
-    $('#fabAdd').onclick=openAdd;$('#openSet').onclick=openSet;$('#syncBtn').onclick=async()=>{if(!bkey()){const v=await dlg({title:'Nhập mã ghi để lưu từ vựng lên Google Sheet',msg:'Chỉ nhập một lần trên máy này. Bỏ trống nếu chỉ muốn tải từ vựng về.',input:'',ok:'Lưu'});if(v){S.bkey=v;persistS()}}syncSheet(true)};
+    $('#fabAdd').onclick=openAdd;$('#openSet').onclick=openSet;$('#upBtn').onclick=doUp;$('#downBtn').onclick=doDown;
   $('#goBtn').onclick=goStudy;$('#goProf').onclick=()=>openProfiles(false);{const dc=$('#dueCard');if(dc)dc.onclick=()=>{cur=makeDue();mode='fc';filter='all';fc={i:0,flip:false,order:null,say:true};lesson()}}
 $('#goStats').onclick=()=>go('stats');
   $('#hero').onclick=()=>{mood('h',1800);burst();dartAll()};
