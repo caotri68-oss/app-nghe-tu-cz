@@ -598,7 +598,7 @@ body{padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js"></script>
 <script>
-const APP_VER='v8 · 27.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
+const APP_VER='v9 · 27.11.26';   // số phiên bản: scripts/bump-ver.py tự tăng khi build APK
 const LANGS={cs:['Tiếng Séc','cs-CZ','ces'],en:['Tiếng Anh','en-US','eng'],ja:['Tiếng Nhật','ja-JP','jpn'],de:['Tiếng Đức','de-DE','deu'],vi:['Tiếng Việt','vi-VN','vie']};
 const LFLAG={cs:'🇨🇿',en:'🇬🇧',ja:'🇯🇵',de:'🇩🇪'},LEARN=['cs','en','ja','de'];
 const lShort=k=>(LANGS[k]||LANGS.cs)[0].replace('Tiếng ','');
@@ -1157,11 +1157,12 @@ function groupView(){
   if(!list.length){curGrp='';return home()}
   const {tot,kn}=grpStats(list);
   $('#app').innerHTML=`<header><button class="back" id="gBack">${I.back} Quay lại</button><h1>${folderIcon(curGrp)} ${esc(curGrp)}</h1><p>${list.length} mục · ${kn}/${tot} từ · <button id="gRen" style="background:none;border:0;color:var(--p);font:inherit;font-weight:700;padding:0">✏️ Đổi tên thư mục</button></p></header><main style="padding-top:14px">${(()=>{const gp=lessons.find(l=>l.gramOnly&&l.group===curGrp),gn=gp?(gp.grammar||[]).length:0;const nw=list.reduce((s,l)=>s+l.items.length,0);return `<div class="card lesson star" id="allGrp" style="--h:150"><div class="em"><span>🔊</span></div><div><b>Nghe tất cả</b><small>${list.length} mục · ${nw} từ, đọc liền một mạch</small></div><span class="go">${I.chev}</span></div><div class="card lesson star" id="gramGrp" style="--h:200"><div class="em"><span>📝</span></div><div><b>Ngữ pháp chung</b><small>${gn?gn+' ghi chú':'Bấm để thêm ngữ pháp của cả bộ'}</small></div><span class="go">${I.chev}</span></div>`})()}${list.map(l=>{const k=l.items.filter(x=>x.known).length,n=l.items.length;
-    return `<div class="card lesson" data-i="${lessons.indexOf(l)}" style="--h:${HUES[Math.abs(l.id)%6]}"><div class="em"><span>${esc((partName(l).trim()[0]||'•').toUpperCase())}</span></div><div><b>${esc(partName(l))}</b><small>${n} từ · Đã thuộc ${k}</small><div class="prog"><i style="width:${n?k/n*100:0}%"></i></div></div><button class="x" data-m="${lessons.indexOf(l)}">${I.dots}</button></div>`}).join('')}<button class="btn sec" id="gNew" style="width:100%;padding:13px 8px;margin-top:4px">${I.plus} Thêm đề mục mới</button></main>${navHtml('home')}`;
+    return `<div class="card lesson" data-i="${lessons.indexOf(l)}" style="--h:${HUES[Math.abs(l.id)%6]}"><div class="em"><span>${esc((partName(l).trim()[0]||'•').toUpperCase())}</span></div><div><b>${esc(partName(l))}</b><small>${n} từ · Đã thuộc ${k}</small><div class="prog"><i style="width:${n?k/n*100:0}%"></i></div></div><button class="x" data-m="${lessons.indexOf(l)}">${I.dots}</button></div>`}).join('')}<button class="btn" id="gPaste" style="width:100%;padding:13px 8px;margin-top:4px">📋 Dán từ vào thư mục (tự chia đề mục)</button><button class="btn sec" id="gNew" style="width:100%;padding:13px 8px;margin-top:8px">${I.plus} Thêm đề mục mới (trống)</button></main>${navHtml('home')}`;
   $('#gBack').onclick=()=>{curGrp='';home()};
   $('#allGrp').onclick=()=>{if(!makeGroupAll(curGrp).items.length)return toast('Thư mục này chưa có từ nào');cur=makeGroupAll(curGrp);mode='cards';filter='all';fc={i:0,flip:false,order:null};lesson()};
   $('#gramGrp').onclick=()=>{cur=groupGram(curGrp);mode='gram';fc={i:0,flip:false,order:null};lesson()};
   $('#gRen').onclick=()=>renameGroup(curGrp);
+  $('#gPaste').onclick=()=>openAddFolder(curGrp);
   $('#gNew').onclick=async()=>{const v=cleanName(await dlg({title:'Thêm đề mục mới',msg:'Ví dụ: D. Ở nhà hàng. Sau đó vào đề mục, bấm "Thêm từ" để thêm từ.',input:'',ok:'Tạo'}));if(!v)return;
     const t=curGrp+' | '+v;if(lessons.some(l=>l.a===S.lang&&!l.gramOnly&&l.title===t))return toast('Đã có đề mục tên này');
     const l={id:Date.now(),title:t,a:S.lang,b:'vi',items:[]};lessons.push(l);persist();toast('Đã tạo đề mục "'+v+'"');cur=l;mode='cards';filter='all';fc={i:0,flip:false,order:null};lesson()};
@@ -2003,8 +2004,10 @@ $('#closeSet').onclick=()=>{$('#setModal').classList.remove('show');if(cur)lesso
 
 // ---------- Add lesson ----------
 let srcTab='text';
-function openAdd(){pendingEx={};$('#srvUrl').value=S.srv;$('#srvTok').value=S.tok;$('#title').value='';$('#raw').value='';$('#pairInfo').textContent='Bài sẽ lưu vào: '+LANGS[S.lang][0]+' ⇄ Tiếng Việt';$('#addModal').classList.add('show')}
-$('#cancelAdd').onclick=()=>$('#addModal').classList.remove('show');
+let addFolder='';
+function openAddFolder(g){openAdd();addFolder=g;$('#title').value=g;$('#title').readOnly=true;$('#pairInfo').textContent='Từ sẽ vào thư mục "'+g+'" ('+LANGS[S.lang][0]+' ⇄ Tiếng Việt). Dòng không có dấu | là đề mục: trùng tên đề mục có sẵn thì thêm vào đó, chưa có thì tạo đề mục mới.'}
+function openAdd(){addFolder='';$('#title').readOnly=false;pendingEx={};$('#srvUrl').value=S.srv;$('#srvTok').value=S.tok;$('#title').value='';$('#raw').value='';$('#pairInfo').textContent='Bài sẽ lưu vào: '+LANGS[S.lang][0]+' ⇄ Tiếng Việt';$('#addModal').classList.add('show')}
+$('#cancelAdd').onclick=()=>{addFolder='';$('#title').readOnly=false;$('#addModal').classList.remove('show')};
 document.querySelectorAll('#srcTabs button').forEach(b=>b.onclick=()=>{srcTab=b.dataset.t;document.querySelectorAll('#srcTabs button').forEach(x=>x.classList.toggle('on',x===b));['text','file','img','link'].forEach(t=>$('#pane-'+t).hidden=t!==srcTab)});
 function splitCols(line){
   const l=line.replace(/[｜¦]/g,'|'); // dấu gạch đứng kiểu rộng (bộ gõ tiếng Việt, Zalo)
@@ -2073,6 +2076,15 @@ function parseSections(text){
 $('#saveAdd').onclick=()=>{
   const secs=parseSections($('#raw').value);
   if(!secs.length)return toast('Chưa có cặp từ nào. Mỗi dòng dạng: từ Séc | nghĩa Việt');
+  if(addFolder){                                   // dán từ vào một thư mục có sẵn: tự chia đề mục
+    const g=addFolder;let nNew=0,nAdd=0,nSec=0,nMade=0;
+    secs.forEach((sc,k)=>{const head=sc.head||'Khác',t=g+' | '+head;
+      let L=lessons.find(l=>l.a===S.lang&&!l.gramOnly&&l.title===t);
+      if(!L){L={id:Date.now()+k,title:t,a:S.lang,b:'vi',items:[]};lessons.push(L);nMade++}
+      const have=new Set(L.items.map(x=>String(x.w||'').trim().toLowerCase()));
+      sc.items.forEach(it=>{const w=String(it.w||'').trim().toLowerCase();if(!w||have.has(w))return;have.add(w);L.items.push(it);nAdd++});nSec++});
+    persist();addFolder='';$('#title').readOnly=false;$('#addModal').classList.remove('show');curGrp=g;home();
+    return toast(`Đã thêm ${nAdd} từ vào ${nSec} đề mục${nMade?` (${nMade} đề mục mới)`:''}`)}
   const base=$('#title').value.trim()||'Bài '+new Date().toLocaleDateString('vi-VN');
   if(!secs.some(s=>s.head)){
     lessons.unshift({id:Date.now(),title:base,a:S.lang,b:'vi',items:secs.flatMap(s=>s.items)});
